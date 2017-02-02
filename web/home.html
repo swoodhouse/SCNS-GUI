@@ -1,0 +1,30 @@
+<div class="site-wrapper">
+    <div class="site-wrapper-inner">
+        <div class="cover-container">
+            <div class="masthead clearfix">
+                <div class="inner">
+                    <h3 class="masthead-brand">SCNS Toolkit</h3>
+                    <nav>
+                        <ul class="nav masthead-nav">
+                            <li class="active"><a href="#/">Load Data</a></li>
+                            <li><a href="#stg">STG</a></li>
+                            <li><a href="#results">Results</a></li>
+                            <li><a href="#analysis">Analysis</a></li>
+                            <li><a href="#config">Configuration</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+            <div class="inner cover" ng-controller="Upload">
+                <h1 class="cover-heading">Upload your data.</h1>
+                <p class="lead">Upload a CSV file containing your binary gene expression data.</p>
+                <p class="lead">
+                    <label class="btn btn-lg btn-default" for="my-file-selector">
+                        <input id="my-file-selector" type="file" name="file" accept=".csv" style="display:none" custom-on-change="uploadFile">
+                        Upload CSV
+                    </label>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

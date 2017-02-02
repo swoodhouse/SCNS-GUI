@@ -1,0 +1,44 @@
+<div class="site-wrapper">
+    <div class="site-wrapper-inner">
+        <div class="cover-container">
+            <div class="masthead clearfix">
+                <div class="inner">
+                    <h3 class="masthead-brand">SCNS Toolkit</h3>
+                    <nav>
+                        <ul class="nav masthead-nav">
+                            <li><a href="#/">Load Data</a></li>
+                            <li><a href="#stg">STG</a></li>
+                            <li><a href="#results">Results</a></li>
+                            <li class="active"><a href="#analysis">Analysis</a></li>
+                            <li><a href="#config">Configuration</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+            <div class="inner cover" ng-controller="Analysis">
+                <div style="height: 100px;"></div>
+                <h2>Stable states</h2>
+                <span ng-bind-html="getHeatmap"></span>
+                <h2>Gene perturbations</h2>
+                <div class="form-group">
+                    <label for="kos" class="col-sm-2 control-label">KO</label>
+                    <ui-select multiple ng-model="perturbations.kos" theme="select2" ng-disabled="disabled" on-select="addKO($model)" on-remove="removeKO($model)" style="width: 82%;" id="kos">
+                        <ui-select-match placeholder="Select genes to knock out...">{{$item}}</ui-select-match>
+                        <ui-select-choices repeat="gene in availableGenes | filter:$select.search">
+                            {{gene}}
+                        </ui-select-choices>
+                    </ui-select>
+                </div>
+                <div class="form-group">
+                    <label for="oes" class="col-sm-2 control-label">OE</label>
+                    <ui-select multiple ng-model="perturbations.oes" theme="select2" ng-disabled="disabled" on-select="addOE($model)" on-remove="removeOE($model)" style="width: 82%;" id="oes">
+                        <ui-select-match placeholder="Select genes to over express...">{{$item}}</ui-select-match>
+                        <ui-select-choices repeat="gene in availableGenes | filter:$select.search">
+                            {{gene}}
+                        </ui-select-choices>
+                    </ui-select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

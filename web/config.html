@@ -1,0 +1,40 @@
+<div class="site-wrapper">
+    <div class="site-wrapper-inner" ng-controller="CloudConfig">
+        <div class="cover-container">
+            <div class="masthead clearfix">
+                <div class="inner">
+                    <h3 class="masthead-brand">SCNS Toolkit</h3>
+                    <nav>
+                        <ul class="nav masthead-nav">
+                            <li><a href="#/">Load Data</a></li>
+                            <li><a href="#stg">STG</a></li>
+                            <li><a href="#results">Results</a></li>
+                            <li><a href="#analysis">Analysis</a></li>
+                            <li class="active"><a href="#config">Configuration</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+            <div class="inner cover">
+                <h2>Connect to Azure</h2>
+                <div style="height: 30px;"></div>
+                <form class="form-horizontal">
+                    <div class="form-group">
+                        <div class="radio">
+                            <label>
+                                <input type="radio" value="false" ng-model="azure.runOnCloud" ng-change="updateRunOnCloud($model)" checked>
+                                Run locally
+                            </label>
+                        </div>
+                        <div class="radio">
+                            <label>
+                                <input type="radio" value="true" ng-model="azure.runOnCloud" ng-disabled="azure.cloudProvisioned != 'true'" ng-change="updateRunOnCloud($model)">
+                                Run in cloud
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

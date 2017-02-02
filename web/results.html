@@ -1,0 +1,47 @@
+<div class="site-wrapper">
+    <div class="site-wrapper-inner">
+        <div class="cover-container">
+            <div class="masthead clearfix">
+                <div class="inner">
+                    <h3 class="masthead-brand">SCNS Toolkit</h3>
+                    <nav>
+                        <ul class="nav masthead-nav">
+                            <li><a href="#/">Load Data</a></li>
+                            <li><a href="#stg">STG</a></li>
+                            <li class="active"><a href="#results">Results</a></li>
+                            <li><a href="#analysis">Analysis</a></li>
+                            <li><a href="#config">Configuration</a></li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+            <div class="inner cover">
+                <div ng-controller="TabsDemoCtrl">
+                    <tabset>
+                        <tab ng-repeat="tab in tabs" active="tab.active" select="setSelectedTab($index)">
+                            <tab-heading>
+                                <i class="fa fa-spinner fa-pulse" ng-hide="isFinished(tab.title)"></i> {{tab.title}}
+                            </tab-heading>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Boolean function</th>
+                                        <th>Threshold (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr ng-repeat="result in tab.results">
+                                        <th>{{$index + 1}}</th>
+                                        <td>{{result.fun}}</td>
+                                        <td>{{result.score}}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </tab>
+                    </tabset>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
