@@ -1,7 +1,7 @@
 ﻿// This file needs to be refactored
 module Synthesis
 
-open System.Collections
+open System.Collections.Generic
 open FSharpx.Collections
 open Microsoft.Z3
 open Data
@@ -20,7 +20,6 @@ let private buildGraph edges =
     let build graph (u, v) =
         let neighbours = if Map.containsKey u graph then v :: Map.find u graph else [v]
         Map.add u neighbours graph
-
     Set.fold build Map.empty edges
 
 let inline private explictEvalToDifferentOr gene circuit state =
@@ -100,20 +99,17 @@ let log2 i =
       r <- r + 1
     r
 
-let generateCircuits maxInputs numGenes =
-    if maxInputs > 3 then failwith "unimplemented"
+let generateBitvecs numInputs numGenes =
     let rec generate v =
         let v = int64 v
         let t = (v ||| (v - 1L)) + 1L
         t ||| ((((t &&& (t * -1L)) / (v &&& -v)) >>> 1) - 1L) |> uint64
 
-    let c = Seq.unfold (fun i -> Some (i, i <<< 1)) 1UL |> Seq.truncate numGenes
-    if maxInputs = 1 then c
-    else
-        let c = Seq.append c (Seq.unfold (fun x -> Some (x, generate x)) 3UL |> Seq.takeWhile (fun x -> log2 x < numGenes))
-        if maxInputs = 2 then c
-        else
-            Seq.append c (Seq.unfold (fun x -> Some (x, generate x)) 7UL |> Seq.takeWhile (fun x -> log2 x < numGenes))
+    match numInputs with
+    | 1 -> Seq.unfold (fun i -> Some (i, i <<< 1)) 1UL |> Seq.truncate numGenes
+    | 2 -> Seq.unfold (fun x -> Some (x, generate x)) 3UL |> Seq.takeWhile (fun x -> log2 x < numGenes)
+    | 3 -> Seq.unfold (fun x -> Some (x, generate x)) 7UL |> Seq.takeWhile (fun x -> log2 x < numGenes)
+    | _ -> failwith "unimplemented"
 
 let eval f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit =
     let max = Set.count statesWithoutGeneTransitions
@@ -161,162 +157,150 @@ let dictToSet dictionary =
     |> Set.ofSeq
 
 let findAllowedEdges gene geneNames maxActivators maxRepressors threshold statesWithGeneTransitions statesWithoutGeneTransitions =
+    if maxActivators > 2 && maxRepressors > 2 then failwith "maxActivators > 2 && maxRepressors > 2 not implemented yet"
     let gene = Seq.findIndex ((=) gene) (Seq.rev geneNames)
     let gene = 1UL <<< gene
+    let numGenes = Array.length geneNames
     let statesWithoutGeneTransitions = Set.map (fun s -> s.Id) statesWithoutGeneTransitions
     let mutable statesWithGeneTransitions' = set [ for (a, b) in statesWithGeneTransitions do yield a.Id; yield b.Id ]
 
-    let mapCircuitToScoreOr = System.Collections.Generic.Dictionary<uint64, int>()
-    let mapCircuitToScoreAnd = System.Collections.Generic.Dictionary<uint64, int>()
+    let act1 = generateBitvecs 1 numGenes |> Seq.cache
+    let act2 = if maxActivators >= 2 then generateBitvecs 2 numGenes |> Seq.cache else Seq.empty
+    let act23 = if maxActivators >= 3 then Seq.append act2 (generateBitvecs 3 numGenes |> Seq.cache) else act2
+    let f b = ((~~~gene) &&& b) <> 0UL
+    let rep1 = if maxRepressors >= 1 then act1 |> Seq.filter f |> Seq.cache else Seq.empty
+    let rep2 = if maxRepressors >= 2 then generateBitvecs 2 numGenes |> Seq.filter f |> Seq.cache else Seq.empty
+    let rep23 = if maxRepressors >= 3 then Seq.append rep2 (generateBitvecs 3 numGenes) |> Seq.filter f |> Seq.cache else rep2
 
-    let trueEdges =
-      set [ for c in generateCircuits maxActivators (Seq.length geneNames) do
-                let score, trueEdges = eval explictEvalToDifferentOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c
+    let mapCircuitToScoreOr = Dictionary<uint64, int>()
+    let mapCircuitToScoreAnd = Dictionary<uint64, int>()
+    let mapCircuitToScoreOrAnd = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreAndOr = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreOrNotOr = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreOrNotAnd = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreAndNotOr = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreAndNotAnd = Dictionary<uint64 * uint64, int>()
+    let mapCircuitToScoreOrAndNotOr = Dictionary<(uint64 * uint64) * uint64, int>()
+    let mapCircuitToScoreOrAndNotAnd = Dictionary<(uint64 * uint64) * uint64, int>()
+    let mapCircuitToScoreAndOrNotOr = Dictionary<(uint64 * uint64) * uint64, int>()
+    let mapCircuitToScoreAndOrNotAnd = Dictionary<(uint64 * uint64) * uint64, int>()
+    let mapCircuitToScoreOrNotOrAnd = Dictionary<uint64 * (uint64 * uint64), int>()
+    let mapCircuitToScoreOrNotAndOr = Dictionary<uint64 * (uint64 * uint64), int>()
+    let mapCircuitToScoreAndNotOrAnd = Dictionary<uint64 * (uint64 * uint64), int>()
+    let mapCircuitToScoreAndNotAndOr = Dictionary<uint64 * (uint64 * uint64), int>()
+
+    for c in act1 do
+        let score, trueEdges = eval explictEvalToDifferentOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c
+        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+        mapCircuitToScoreOr.Add(c, score)
+    for c in act23 do
+        let score, trueEdges = eval explictEvalToDifferentOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c
+        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+        mapCircuitToScoreOr.Add(c, score)
+        let score, trueEdges = eval explictEvalToDifferentAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c
+        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+        mapCircuitToScoreAnd.Add(c, score)
+
+    if maxActivators >= 3 then
+        for c1 in act2 do
+            for c2 in act1 do
+                if c1 &&& c2 = 0UL then
+                    let score, trueEdges = eval2 explictEvalToDifferentOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c1 c2
+                    statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                    mapCircuitToScoreOrAnd.Add((c1, c2), score)
+                    let score, trueEdges = eval2 explictEvalToDifferentAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c1 c2
+                    statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                    mapCircuitToScoreAndOr.Add((c1, c2), score)
+
+    for a in act1 do
+        for r in rep1 do
+            if a <> r then
+                let score, trueEdges = eval2 explictEvalToDifferentOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
                 statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                mapCircuitToScoreOr.Add(c, score)
-                yield! trueEdges
-
-                let score, trueEdges = eval explictEvalToDifferentAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c
+                mapCircuitToScoreOrNotOr.Add((a, r), score)
+    for a in act23 do
+        for r in rep1 do
+            let score, trueEdges = eval2 explictEvalToDifferentOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+            statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+            mapCircuitToScoreOrNotOr.Add((a, r), score)
+            let score, trueEdges = eval2 explictEvalToDifferentAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+            statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+            mapCircuitToScoreAndNotOr.Add((a, r), score)
+    for a in act1 do
+        for r in rep23 do
+            let score, trueEdges = eval2 explictEvalToDifferentOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+            statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+            mapCircuitToScoreOrNotOr.Add((a, r), score)
+            let score, trueEdges = eval2 explictEvalToDifferentOrNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+            statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+            mapCircuitToScoreOrNotAnd.Add((a, r), score)
+    for a in act23 do
+        for r in rep23 do
+            if a <> r then
+                let score, trueEdges = eval2 explictEvalToDifferentOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
                 statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                mapCircuitToScoreAnd.Add(c, score)
-                yield! trueEdges ]
+                mapCircuitToScoreOrNotOr.Add((a, r), score)
+                let score, trueEdges = eval2 explictEvalToDifferentOrNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+                statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                mapCircuitToScoreOrNotAnd.Add((a, r), score)
+                let score, trueEdges = eval2 explictEvalToDifferentAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+                statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                mapCircuitToScoreAndNotOr.Add((a, r), score)
+                let score, trueEdges = eval2 explictEvalToDifferentAndNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
+                statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                mapCircuitToScoreAndNotAnd.Add((a, r), score)
 
-    let mapCircuitToScoreAndOr = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    let mapCircuitToScoreOrAnd = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    
-    let trueEdges = trueEdges +
-        if maxActivators < 3 then
-            Set.empty
-        else
-            set [ for c1 in Set.ofSeq (generateCircuits 2 (Seq.length geneNames)) - Set.ofSeq (generateCircuits 1 (Seq.length geneNames)) do
-                      for c2 in generateCircuits 1 (Seq.length geneNames) do
-                          if c1 &&& c2 = 0UL then
-                              let score, trueEdges = eval2 explictEvalToDifferentAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c1 c2
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreAndOr.ContainsKey((c1, c2)) then mapCircuitToScoreAndOr.Add((c1, c2), score)
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c2 c1
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreAndOr.ContainsKey((c2, c1)) then mapCircuitToScoreAndOr.Add((c2, c1), score)
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c1 c2
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreOrAnd.ContainsKey((c1, c2)) then mapCircuitToScoreOrAnd.Add((c1, c2), score)
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions c2 c1
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreOrAnd.ContainsKey((c2, c1)) then mapCircuitToScoreOrAnd.Add((c2, c1), score)
-                              yield! trueEdges ]
-
-    let mapCircuitToScoreOrNotOr = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    let mapCircuitToScoreOrNotAnd = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    let mapCircuitToScoreAndNotOr = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    let mapCircuitToScoreAndNotAnd = System.Collections.Generic.Dictionary<uint64 * uint64, int>()
-    let mapCircuitToScoreAndOrNotOr = System.Collections.Generic.Dictionary<(uint64 * uint64) * uint64, int>()
-    let mapCircuitToScoreAndOrNotAnd = System.Collections.Generic.Dictionary<(uint64 * uint64) * uint64, int>()
-    let mapCircuitToScoreOrAndNotOr = System.Collections.Generic.Dictionary<(uint64 * uint64) * uint64, int>()
-    let mapCircuitToScoreOrAndNotAnd = System.Collections.Generic.Dictionary<(uint64 * uint64) * uint64, int>()
-    let mapCircuitToScoreOrNotAndOr = System.Collections.Generic.Dictionary<uint64 * (uint64 * uint64), int>()
-    let mapCircuitToScoreOrNotOrAnd = System.Collections.Generic.Dictionary<uint64 * (uint64 * uint64), int>()
-    let mapCircuitToScoreAndNotAndOr = System.Collections.Generic.Dictionary<uint64 * (uint64 * uint64), int>()
-    let mapCircuitToScoreAndNotOrAnd = System.Collections.Generic.Dictionary<uint64 * (uint64 * uint64), int>()
-
-    let trueEdges = trueEdges +
-        if maxRepressors < 1 then
-            Set.empty
-        else
-            set [ for a in generateCircuits maxActivators (Seq.length geneNames) do
-                      for r in generateCircuits maxRepressors (Seq.length geneNames) do
-                          let r = (~~~gene) &&& r
-                          if r <> 0UL && a <> r then
-                              let score, trueEdges = eval2 explictEvalToDifferentOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreOrNotOr.ContainsKey(a, r) then
-                                  mapCircuitToScoreOrNotOr.Add((a, r), score)
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentOrNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreOrNotAnd.ContainsKey(a, r) then
-                                  mapCircuitToScoreOrNotAnd.Add((a, r), score) 
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreAndNotOr.ContainsKey(a, r) then
-                                  mapCircuitToScoreAndNotOr.Add((a, r), score)
-                              yield! trueEdges
-
-                              let score, trueEdges = eval2 explictEvalToDifferentAndNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r
-                              statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                              if not <| mapCircuitToScoreAndNotAnd.ContainsKey(a, r) then
-                                  mapCircuitToScoreAndNotAnd.Add((a, r), score)                                  
-                              yield! trueEdges ]
-
-    let trueEdges = trueEdges +
-        if maxActivators < 3 || maxRepressors < 1 then
-            Set.empty
-        else
-            set [ for a1 in Set.ofSeq (generateCircuits 2 (Seq.length geneNames)) - Set.ofSeq (generateCircuits 1 (Seq.length geneNames)) do
-                      for a2 in generateCircuits 1 (Seq.length geneNames) do
-                          if a1 &&& a2 = 0UL then
-                              for r in generateCircuits maxRepressors (Seq.length geneNames) do
-                                  let r = (~~~gene) &&& r
-                                  if r <> 0UL then                              
-                                      let score, trueEdges = eval3 explictEvalToDifferentAndOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
-                                      statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                      if not <| mapCircuitToScoreAndOrNotOr.ContainsKey((a1, a2), r) then mapCircuitToScoreAndOrNotOr.Add(((a1, a2), r), score)
-                                      yield! trueEdges
-
-                                      let score, trueEdges = eval3 explictEvalToDifferentAndOrNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
-                                      statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                      if not <| mapCircuitToScoreAndOrNotAnd.ContainsKey((a1, a2), r) then mapCircuitToScoreAndOrNotAnd.Add(((a1, a2), r), score)
-                                      yield! trueEdges
-
-                                      let score, trueEdges = eval3 explictEvalToDifferentOrAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
-                                      statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                      if not <| mapCircuitToScoreOrAndNotOr.ContainsKey((a1, a2), r) then mapCircuitToScoreOrAndNotOr.Add(((a1, a2), r), score)
-                                      yield! trueEdges
-
-                                      let score, trueEdges = eval3 explictEvalToDifferentOrAndNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
-                                      statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                      if not <| mapCircuitToScoreOrAndNotAnd.ContainsKey((a1, a2), r) then mapCircuitToScoreOrAndNotAnd.Add(((a1, a2), r), score)
-                                      yield! trueEdges ]
-                              
-    let trueEdges = trueEdges +
-        if maxRepressors < 3 then
-            Set.empty
-        else
-            set [ for a in generateCircuits maxActivators (Seq.length geneNames) do
-                      for r1 in Set.ofSeq (generateCircuits 2 (Seq.length geneNames)) - Set.ofSeq (generateCircuits 1 (Seq.length geneNames)) do
-                          for r2 in generateCircuits 1 (Seq.length geneNames) do
-                              let r1 = (~~~gene) &&& r1
-                              let r2 = (~~~gene) &&& r2
-                              if r1 <> 0UL && r2 <> 0UL && r1 &&& r2 = 0UL then  
-                                  let score, trueEdges = eval3 explictEvalToDifferentOrNotAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
-                                  statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                  if not <| mapCircuitToScoreOrNotAndOr.ContainsKey(a, (r1, r2)) then mapCircuitToScoreOrNotAndOr.Add((a, (r1, r2)), score)
-                                  yield! trueEdges
-
-                                  let score, trueEdges = eval3 explictEvalToDifferentOrNotOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
-                                  statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                  if not <| mapCircuitToScoreOrNotOrAnd.ContainsKey(a, (r1, r2)) then mapCircuitToScoreOrNotOrAnd.Add((a, (r1, r2)), score)
-                                  yield! trueEdges
-
-                                  let score, trueEdges = eval3 explictEvalToDifferentAndNotAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
-                                  statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                  if not <| mapCircuitToScoreAndNotAndOr.ContainsKey(a, (r1, r2)) then mapCircuitToScoreAndNotAndOr.Add((a, (r1, r2)), score)
-                                  yield! trueEdges
-
-                                  let score, trueEdges = eval3 explictEvalToDifferentAndNotOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
-                                  statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
-                                  if not <| mapCircuitToScoreAndNotOrAnd.ContainsKey(a, (r1, r2)) then mapCircuitToScoreAndNotOrAnd.Add((a, (r1, r2)), score)
-                                  yield! trueEdges ]
-
-    if maxActivators > 2 && maxRepressors > 2 then failwith "maxActivators > 2 && maxRepressors > 2 not implemented yet"
+    if maxActivators >= 3 then
+        for a1 in act2 do
+            for a2 in act1 do
+                if a1 &&& a2 = 0UL then
+                    for r in rep1 do
+                        let score, trueEdges = eval3 explictEvalToDifferentOrAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrAndNotOr.Add(((a1, a2), r), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentAndOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreAndOrNotOr.Add(((a1, a2), r), score)
+                    for r in rep23 do
+                        let score, trueEdges = eval3 explictEvalToDifferentOrAndNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrAndNotOr.Add(((a1, a2), r), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentAndOrNotOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreAndOrNotOr.Add(((a1, a2), r), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentOrAndNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrAndNotAnd.Add(((a1, a2), r), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentAndOrNotAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a1 a2 r
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreAndOrNotAnd.Add(((a1, a2), r), score)
+    if maxRepressors >= 3 then
+        for a in act1 do
+            for r1 in rep2 do
+                for r2 in rep1 do
+                    if r1 &&& r2 = 0UL then
+                        let score, trueEdges = eval3 explictEvalToDifferentOrNotAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrNotAndOr.Add((a, (r1, r2)), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentOrNotOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrNotOrAnd.Add((a, (r1, r2)), score)
+        for a in act23 do
+            for r1 in rep2 do
+                for r2 in rep1 do
+                    if r1 &&& r2 = 0UL then
+                        let score, trueEdges = eval3 explictEvalToDifferentOrNotAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrNotAndOr.Add((a, (r1, r2)), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentOrNotOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreOrNotOrAnd.Add((a, (r1, r2)), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentAndNotAndOr gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreAndNotAndOr.Add((a, (r1, r2)), score)
+                        let score, trueEdges = eval3 explictEvalToDifferentAndNotOrAnd gene threshold statesWithGeneTransitions' statesWithoutGeneTransitions a r1 r2
+                        statesWithGeneTransitions' <- statesWithGeneTransitions' - trueEdges
+                        mapCircuitToScoreAndNotOrAnd.Add((a, (r1, r2)), score)
 
     let max = Set.count statesWithoutGeneTransitions
     let threshold = max * threshold / 100
@@ -340,10 +324,10 @@ let findAllowedEdges gene geneNames maxActivators maxRepressors threshold states
 
     let circuits = circuitsOr + circuitsAnd + circuitsAndOr + circuitsOrAnd + circuitsOrNotOr + circuitsOrNotAnd + circuitsAndNotOr + circuitsAndNotAnd +
                    circuitsAndOrNotOr + circuitsAndOrNotAnd + circuitsOrAndNotOr + circuitsOrAndNotAnd + circuitsOrNotAndOr + circuitsOrNotOrAnd + circuitsAndNotAndOr + circuitsAndNotOrAnd
-
+                   
     (set [ for (a, b) in statesWithGeneTransitions do
-               if Set.contains a.Id trueEdges then yield (a, b)
-               if Set.contains b.Id trueEdges then yield (b, a) ], circuits)
+               if not (Set.contains a.Id statesWithGeneTransitions') then yield (a, b)
+               if not (Set.contains b.Id statesWithGeneTransitions') then yield (b, a) ], circuits)
 
 let findPaths allowedEdges initialStates targetStates = 
     let reducedStateGraph = buildGraph allowedEdges

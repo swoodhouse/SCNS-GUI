@@ -162,18 +162,6 @@ let circuitToEncoding (solver : SATSolver) circuit geneNames (a : BitVec []) (r 
             let n2 = nameToIndex n2 geneNames
             let n3 = nameToIndex n3 geneNames
             solver.And [| solver.Eq(a.[0], AND); solver.Eq(a.[1], OR); solver.Eq(a.[2], n1); solver.Eq(a.[3], n2); solver.Eq(a.[4], n3); fix 3 |]
-        // TODO: remove duplicate syntactically different circuits
-        | Circuit.Or (Circuit.Node n1, Circuit.And(Circuit.Node n2, Circuit.Node n3)) ->
-            let n1 = nameToIndex n1 geneNames
-            let n2 = nameToIndex n2 geneNames
-            let n3 = nameToIndex n3 geneNames
-            solver.And [| solver.Eq(a.[0], OR); solver.Eq(a.[1], AND); solver.Eq(a.[2], n1); solver.Eq(a.[3], n2); solver.Eq(a.[4], n3); fix 3 |]
-        | Circuit.And (Circuit.Node n1, Circuit.Or(Circuit.Node n2, Circuit.Node n3)) ->
-            let n1 = nameToIndex n1 geneNames
-            let n2 = nameToIndex n2 geneNames
-            let n3 = nameToIndex n3 geneNames
-            solver.And [| solver.Eq(a.[0], AND); solver.Eq(a.[1], OR); solver.Eq(a.[2], n1); solver.Eq(a.[3], n2); solver.Eq(a.[4], n3); fix 3 |]
-
     match circuit with
     | Circuit.And (act, Circuit.Not rep) -> solver.And [| circuitToEncoding a act fixMaxActivators; circuitToEncoding r rep fixMaxRepressors |]
     | circuit -> solver.And [| circuitToEncoding a circuit fixMaxActivators; fixMaxRepressors 0 |]
