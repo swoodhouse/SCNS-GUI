@@ -11,14 +11,19 @@ let private loadCsv (filename : string) =
     if csv.NumberOfColumns - 1 > 64 then
         failwith "SCNS does not support datasets with more than 64 genes"
 
+    let header = (Option.get csv.Headers).[2..]
+
+    // important to sort by alphabetical order of genes in order to get consistent conversion to bitvectors
     let parseRow (r : CsvRow) =
         let name, class' = r.GetColumn 0, r.GetColumn 1
-        ((name, class'), [| for i in 2 .. csv.NumberOfColumns - 1 do
-                                yield System.Boolean.Parse (r.GetColumn i) |])
-    
-    let header = (Option.get csv.Headers).[2..]
+        let values = [| for i in 2 .. csv.NumberOfColumns - 1 do
+                            yield (i - 2, System.Boolean.Parse (r.GetColumn i)) |]
+                  |> Array.sortBy (fun (i, _) -> header.[i])
+                  |> Array.unzip |> snd
+        ((name, class'), values)
+
     let rows = Seq.map parseRow csv.Rows
-    (header, rows)
+    (Array.sort header, rows)
 
 let private boolArrayToUint32 (a : bool []) =
     let a = BitArray (Array.rev a)
