@@ -6,14 +6,6 @@ let inhibition pre activ = And (activ, Not pre)
 let andList cs = Seq.reduce (fun x y -> And (x, y)) cs
 let orList cs = Seq.reduce (fun x y -> Or (x, y)) cs
 
-let rec evaluate circuit nodeValues =
-    match circuit with
-    | Value b -> b
-    | And (c1, c2) -> evaluate c1 nodeValues && evaluate c2 nodeValues
-    | Or (c1, c2) -> evaluate c1 nodeValues || evaluate c2 nodeValues
-    | Not c -> not (evaluate c nodeValues)
-    | Node name -> Map.find name nodeValues
-
 let rec printCircuit c =
     match c with
     | Value b -> string b

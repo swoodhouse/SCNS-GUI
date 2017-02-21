@@ -92,14 +92,14 @@ let inline private explictEvalToDifferentAndNotAndOr gene activator repressor1 r
 let inline private explictEvalToDifferentAndNotOrAnd gene activator repressor1 repressor2 state  =
     explictNot (explictEvalToDifferentAnd gene activator state) (explictEvalToDifferentOrAnd gene repressor1 repressor2 state) gene state
 
-let log2 i =
+let private log2 i =
     let mutable i = i
     let mutable r = 0
     while (i <- i >>> 1; i <> 0UL) do
       r <- r + 1
     r
 
-let generateBitvecs numInputs numGenes =
+let private generateBitvecs numInputs numGenes =
     let rec generate v =
         let v = int64 v
         let t = (v ||| (v - 1L)) + 1L
@@ -111,7 +111,7 @@ let generateBitvecs numInputs numGenes =
     | 3 -> Seq.unfold (fun x -> Some (x, generate x)) 7UL |> Seq.takeWhile (fun x -> log2 x < numGenes)
     | _ -> failwith "unimplemented"
 
-let eval f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit =
+let private eval f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit =
     let max = Set.count statesWithoutGeneTransitions
     let threshold = max * threshold / 100
     
@@ -131,7 +131,7 @@ let eval2 f gene threshold statesWithGeneTransitions statesWithoutGeneTransition
         (t, set [ for s in statesWithGeneTransitions do
                       if f gene circuit1 circuit2 s then yield s])
 
-let eval3 f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit1 circuit2 circuit3 =
+let private eval3 f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit1 circuit2 circuit3 =
     let max = Set.count statesWithoutGeneTransitions
     let threshold = max * threshold / 100
 
@@ -141,7 +141,7 @@ let eval3 f gene threshold statesWithGeneTransitions statesWithoutGeneTransition
         (t, set [ for s in statesWithGeneTransitions do
                       if f gene circuit1 circuit2 circuit3 s then yield s])
                         
-let eval4 f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit1 circuit2 circuit3 circuit4 =
+let private eval4 f gene threshold statesWithGeneTransitions statesWithoutGeneTransitions circuit1 circuit2 circuit3 circuit4 =
     let max = Set.count statesWithoutGeneTransitions
     let threshold = max * threshold / 100
 
@@ -151,7 +151,7 @@ let eval4 f gene threshold statesWithGeneTransitions statesWithoutGeneTransition
         (t, set [ for s in statesWithGeneTransitions do
                       if f gene circuit1 circuit2 circuit3 circuit4 s then yield s])
 
-let dictToSet dictionary = 
+let private dictToSet dictionary =
     (dictionary :> seq<_>)
     |> Seq.map (|KeyValue|)
     |> Set.ofSeq
