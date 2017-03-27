@@ -14,6 +14,7 @@ Software requirements:
 1.	Microsoft Windows 7 or newer.
 2.	A modern browser such as Edge, Chrome or Firefox as your default browser.
 The SCNS installer will handle the installation of dependencies – the .NET framework and R programming language.
+
 Hardware requirements:
 1.	1 GHz or faster 64 bit processor.
 2.	1 GB of RAM.
