@@ -15,6 +15,7 @@ open MBrace.Core
 open RProvider
 open RProvider.utils
 open Circuit
+open BmaJson
 open Data
 open ConstructSTG
 open StaticFiles
@@ -98,13 +99,21 @@ let private installRpackages () =
 //        R.install_packages("caTools_1.17.1.zip") |> ignore
 //        R.install_packages("gplots_3.0.1.zip") |> ignore
 
+type ResultsStream = IDictionary<Gene, (Circuit * int) list>
+
+let getModel (resultsStream : ResultsStream) =
+    if not (Seq.isEmpty resultsStream.Keys) && resultsStream.Values |> Seq.map (not << List.isEmpty) |> Seq.reduce (&&) then // refactor
+        Map.ofSeq [for x in resultsStream do yield (x.Key, combineCircuits x.Key (List.unzip x.Value |> fst))] |> Some
+    else
+        None
+
 type ServerState () = class
     let stg = ConcurrentRef<Stg option>(None)
     let geneParameters = ConcurrentRef<Map<Gene, int*int*int>>(Map.empty)
    
     let initialClasses = ConcurrentRef<Set<string>>(Set.empty)
     let targetClasses = ConcurrentRef<Set<string>>(Set.empty)
-    let (resultsStream : IDictionary<Gene, (Circuit * int) list>) = ConcurrentDictionary() :> IDictionary<Gene, (Circuit * int) list>
+    let (resultsStream : ResultsStream) = ConcurrentDictionary() :> ResultsStream
     let (synthesisTerminated : IDictionary<Gene, bool>) = ConcurrentDictionary() :> IDictionary<Gene, bool>
     let stableStatesTerminated = ConcurrentRef<bool>(false)
     let koGenes = ConcurrentRef<Set<string>>(Set.empty)
@@ -200,16 +209,22 @@ type ServerState () = class
                                                                   |> Seq.reduce (fun x y -> x + ", " + y)
                                                                   |> sprintf "{ %s }"
 
-                                                    let json = sprintf "{ \"results\": %s, \"terminated\": %s }" results terminated
+                                                    let completeModelFound = if getModel resultsStream |> Option.isSome then "true" else "false"
+
+                                                    let json = sprintf "{ \"results\": %s, \"terminated\": %s, \"completeModelFound\": %s }" results terminated completeModelFound
                                                     OK json >=> Writers.setMimeType "application/json")
-                                                
-               path "/synthesisTerminated" >=> request (fun _ ->
-                                                            if synthesisTerminated.Keys |> Seq.isEmpty then RequestErrors.BAD_REQUEST "Synthesis not executed"
-                                                            else
-                                                              if synthesisTerminated.Values |> Seq.reduce (&&) then OK "true" else OK "false")
                path "/stableStatesTerminated" >=> request (fun _ -> if stableStatesTerminated.Get then OK "true" else OK "false")
                path "/stableStatesHeatmap.png" >=> request (fun _ -> noCache >=> file "stableStatesHeatmap.png")
                path "/graph.json" >=> request (fun _ -> noCache >=> Writers.setMimeType "application/json" >=> OK (Option.get stg.Get).json)
+
+               path "/model.json" >=> request (fun _ -> if resultsStream.Keys |> Seq.isEmpty then RequestErrors.BAD_REQUEST "Synthesis not executed"
+                                                        else
+                                                            match getModel resultsStream with
+                                                            | Some model ->
+                                                                let json = modelToBmaJson model
+                                                                noCache >=> Writers.setMimeType "application/json" >=> OK json
+                                                            | None -> Writers.setMimeType "application/json" >=> OK "")
+
                path "/genes" >=> request (fun _ -> if geneParameters.Get |> Map.isEmpty then RequestErrors.BAD_REQUEST "No data"
                                                    else
                                                        let f x = if Seq.isEmpty x then "[ ]"
@@ -222,7 +237,6 @@ type ServerState () = class
 
                path "/cloudProvisioned" >=> request (fun _ -> if Option.isSome deployment.Get then OK "true" else OK "false") 
                path "/runOnCloud">=> request (fun _ -> if Option.isSome cluster.Get then OK "true" else OK "false") ])
-
 
             POST >=> choose
               [ path "/uploadCSV" >=> request (fun req -> let file = List.head req.files
@@ -291,10 +305,11 @@ type ServerState () = class
                                                                      synthesisTerminated.[g] <- true
                                                                    }) |> Sequential |> Async.Ignore
                                                                    
-                                                        if resultsStream.Values |> Seq.map (not << List.isEmpty) |> Seq.reduce (&&) then
-                                                            let model = [for x in resultsStream do yield (x.Key, StableStates.combineCircuits x.Key (List.unzip x.Value |> fst))] |> Map.ofSeq
-                                                            Heatmap.heatmap "stableStatesHeatmap.png" (StableStates.stableStates model)
-                                                            stableStatesTerminated.Set true
+                                                        match getModel resultsStream with
+                                                            | Some model ->
+                                                                Heatmap.heatmap "stableStatesHeatmap.png" (StableStates.stableStates model)
+                                                                stableStatesTerminated.Set true
+                                                            | None -> ignore ()
                                                     }
                                                     Async.Start(comp, cts.Token)
                                                     OK "Executing")
@@ -351,11 +366,14 @@ type ServerState () = class
                                                       stableStatesCancellation.Set(cts')
                                                       stableStatesTerminated.Set false
                                                       let comp = async {
-                                                          let model = [for x in resultsStream do yield (x.Key, StableStates.combineCircuits x.Key (List.unzip x.Value |> fst))] |> Map.ofSeq
-                                                                   |> StableStates.knockOut kos
-                                                                   |> StableStates.overExpress oes
-                                                          Heatmap.heatmap "stableStatesHeatmap.png" (StableStates.stableStates model)
-                                                          stableStatesTerminated.Set true
+                                                            match getModel resultsStream with
+                                                            | Some model ->
+                                                                let model = model
+                                                                         |> StableStates.knockOut kos
+                                                                         |> StableStates.overExpress oes
+                                                                Heatmap.heatmap "stableStatesHeatmap.png" (StableStates.stableStates model)
+                                                                stableStatesTerminated.Set true
+                                                            | None -> ignore ()
                                                       }
                                                       Async.Start (comp, cts'.Token)
                                                       OK "Executing")

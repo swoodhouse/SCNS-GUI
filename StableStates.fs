@@ -30,17 +30,14 @@ let private constraintsBool (solver : SATSolver) (m : Model) (d : FuncDecl) =
 let private constraints'' (solver : SATSolver) (m : Model) (ds : FuncDecl []) =
     solver.Or <| Array.map (constraintsBool solver m) ds
 
-// makes a transition iff all sub-models do
-let combineCircuits gene cs =
-    Or (And (Not (Node gene), andList cs),
-        And (Node gene, orList cs))
-
 let stableStates model =
+    printfn "stable states called" //temp
+
     use solver = new SATSolver()
     solver.Add(solver.And <| Seq.map (isFixpoint solver) (Map.toSeq model))
 
     let mutable i = 0
-    [ while solver.Check() = Status.SATISFIABLE && i < 20 do
+    [ while solver.Check() = Status.SATISFIABLE && i < 50 do
           i <- i + 1
           let m = solver.Model
           let variableDecls = m.ConstDecls

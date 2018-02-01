@@ -130,7 +130,7 @@ app.controller('DemoCtrl', function ($scope, $http, $location, $rootScope) {
                then(function (response) {
                    $location.path('results');
                    $rootScope.synthClicked = true;
-                   $rootScope.synthTerminated = false;
+                   $rootScope.completeModelFound = false;
                }, function (response) {
                });
     };
@@ -204,7 +204,7 @@ app.controller('checkStableStatesController', function ($rootScope, $location) {
     else if (!$rootScope.synthClicked) {
         $location.path('stg');
     }
-    else if (!$rootScope.synthTerminated) {
+    else if (!$rootScope.completeModelFound) {
         $location.path('results');
     }
 });
@@ -229,7 +229,7 @@ app.controller('Upload', function ($scope, $rootScope, $http, $timeout, $locatio
                    $location.path('stg');
                    $rootScope.data = true;
                    $rootScope.synthClicked = false;
-                   $rootScope.synthTerminated = false;
+                   $rootScope.completeModelFound = false;
                }, function (response) {
                    alert('fail');
                });
@@ -258,7 +258,7 @@ app.controller('TabsDemoCtrl', function ($scope, $rootScope, $timeout, $http) {
               $scope.tabs[selectedTab].active = true;
 
               if (allTrue(terminated)) {
-                  $rootScope.synthTerminated = true;
+                  $rootScope.completeModelFound = response.data.completeModelFound;
               }
               else {
                   $timeout(poll, 3000);

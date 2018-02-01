@@ -36,12 +36,10 @@ let private plotHeatmap genes data =
                 labRow = na) |> ignore
 
 let heatmap filename data =
-    if List.length data >= 20 then ()
-    else
-        try
-            let genes = List.head data |> Map.keys
-            R.png(filename, width=1000, height=500) |> ignore
-            plotHeatmap genes data
-            R.dev_off() |> ignore
-        with
-        | _ -> ()
+    try
+        let genes = List.head data |> Map.keys
+        R.png(filename, width=1000, height=500) |> ignore
+        plotHeatmap genes data
+        R.dev_off() |> ignore
+    with
+    | _ -> ()

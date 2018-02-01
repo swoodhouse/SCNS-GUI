@@ -1,7 +1,7 @@
 ﻿module Data
 
+open Circuit
 open System
-type Gene = string
 
 [<CustomEquality; CustomComparison>]
 type State =

@@ -15,8 +15,8 @@
                     </nav>
                 </div>
             </div>
-            <div class="inner cover">
-                <div ng-controller="TabsDemoCtrl">
+            <div class="inner cover" ng-controller="TabsDemoCtrl">
+                <div>
                     <tabset>
                         <tab ng-repeat="tab in tabs" active="tab.active" select="setSelectedTab($index)">
                             <tab-heading>
@@ -40,6 +40,9 @@
                             </table>
                         </tab>
                     </tabset>
+                </div>
+                <div class="btn-group pull-right" role="group">
+                    <a class="btn btn-default" href="model.json" ng-show="completeModelFound" download>Save BMA JSON</a>
                 </div>
             </div>
         </div>

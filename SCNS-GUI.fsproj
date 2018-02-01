@@ -56,6 +56,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Circuit.fs" />
+    <Compile Include="BmaJson.fs" />
     <Compile Include="Data.fs" />
     <Compile Include="ConstructSTG.fs" />
     <Compile Include="ShortestPaths.fs" />

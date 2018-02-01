@@ -1,6 +1,7 @@
 ﻿// This file needs to be refactored. And move to Left encoding
 module FunctionEncoding
 
+open Circuit
 open Data
 open SAT
 
