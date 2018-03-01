@@ -16,6 +16,7 @@ open RProvider
 open RProvider.utils
 open Circuit
 open BmaJson
+open SBMLQual
 open Data
 open ConstructSTG
 open StaticFiles
@@ -224,6 +225,14 @@ type ServerState () = class
                                                                 let json = modelToBmaJson model
                                                                 noCache >=> Writers.setMimeType "application/json" >=> OK json
                                                             | None -> Writers.setMimeType "application/json" >=> OK "")
+
+               path "/model.sbml" >=> request (fun _ -> if resultsStream.Keys |> Seq.isEmpty then RequestErrors.BAD_REQUEST "Synthesis not executed"
+                                                        else
+                                                            match getModel resultsStream with
+                                                            | Some model ->
+                                                                let xml = modelToSbml model
+                                                                noCache >=> Writers.setMimeType "application/xml" >=> OK xml
+                                                            | None -> Writers.setMimeType "application/xml" >=> OK "")
 
                path "/genes" >=> request (fun _ -> if geneParameters.Get |> Map.isEmpty then RequestErrors.BAD_REQUEST "No data"
                                                    else
