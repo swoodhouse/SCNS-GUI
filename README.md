@@ -11,18 +11,21 @@ For data sets of up to a few thousand cells, SCNS can typically reconstruct a Bo
 
 ## Software and hardware requirements
 Software requirements:
-1.	Microsoft Windows 7 or newer.
+1.	Microsoft Windows, macOS or Linux.
 2.	A modern browser such as Edge, Chrome or Firefox as your default browser.
-The SCNS installer will handle the installation of dependencies – the .NET framework and R programming language.
+3. The .NET framework or mono.
+4. The R programming language.
 
 Hardware requirements:
 1.	1 GHz or faster 64 bit processor.
 2.	1 GB of RAM.
 3.	2GB hard drive with at least 1GB of free space.
 
-## Installation from binaries
-To install SCNS, download the Windows installer here: https://github.com/swoodhouse/SCNS-GUI/blob/master/binaries/ScnsInstaller.exe?raw=true
-After running the installer, a links to run SCNS will appear in the start menu.
+## Downloading the binaries
+To install SCNS, download the latest zipped binaries from here: https://github.com/swoodhouse/SCNS-GUI/releases. SCNS_GUI.exe will start the SCNS toolkit.
+
+To run on Linux or macOS under mono:
+```mono SCNS_GUI.exe```
 
 ## Running on the toy common myeloid progenitor example
 As an initial illustration of the tool, we will reconstruct the Boolean network model from the paper, Hierarchical Differentiation of Myeloid Progenitors Is Encoded in the Transcription Factor Network (Krumsiek, Marr, Schroeder, & Theis, 2011).
