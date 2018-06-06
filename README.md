@@ -11,10 +11,10 @@ For data sets of up to a few thousand cells, SCNS can typically reconstruct a Bo
 
 ## Software and hardware requirements
 Software requirements:
-1.	Microsoft Windows, macOS or Linux.
-2.	A modern browser such as Edge, Chrome or Firefox as your default browser.
+1. Microsoft Windows, macOS or Linux.
+2. A modern browser such as Edge, Chrome or Firefox as your default browser.
 3. The .NET framework or mono.
-4. The R programming language.
+4. The R programming language, and the R binaries in your PATH.
 
 Hardware requirements:
 1.	1 GHz or faster 64 bit processor.
