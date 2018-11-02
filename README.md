@@ -14,7 +14,7 @@ Software requirements:
 1. Microsoft Windows, macOS or Linux.
 2. A modern browser such as Edge, Chrome or Firefox as your default browser.
 3. The .NET framework or mono.
-4. The R programming language, and the R binaries in your PATH.
+4. The R programming language, and the R binaries in your PATH. There is a known issue with R.NET that currently means R version 3.5.0 is not compatible with SCNS.
 
 Hardware requirements:
 1.	1 GHz or faster 64 bit processor.
